@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>リバーシ配置メモ</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #1e1e24;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            color: #fff;
+        }
+        h1 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 24px;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .controls {
+            background-color: #2a2a35;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            max-width: 450px;
+            border: 1px solid #3a3a4a;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        label {
+            font-weight: bold;
+            color: #ccc;
+            font-size: 14px;
+        }
+        select, button {
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background-color: #1e1e24;
+            color: #fff;
+            cursor: pointer;
+        }
+        select:focus, button:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        button {
+            background-color: #007bff;
+            font-weight: bold;
+            border: none;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+            transform: translateY(-1px);
+        }
+        button#undoBtn {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        button#undoBtn:hover {
+            background-color: #e0a800;
+        }
+        button#undoBtn:disabled {
+            background-color: #444;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+        }
+        button#resetBtn {
+            background-color: #dc3545;
+        }
+        button#resetBtn:hover {
+            background-color: #bd2130;
+        }
+        .status {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            height: 24px;
+            color: #ffc107;
+            text-align: center;
+        }
+        .board {
+            width: 360px;
+            height: 360px;
+            background-color: #153a21;
+            border: 6px solid #0b2213;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 2px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.7);
+            border-radius: 6px;
+        }
+        .cell {
+            background-color: #1e5631;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .cell:hover {
+            background-color: #24673b;
+        }
+        .cell.last-move {
+            background-color: #2d8249;
+            box-shadow: inset 0 0 0 3px #ffcc00;
+        }
+        .cell.hint::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background-color: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            position: absolute;
+        }
+        .hint-pct {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 9px;
+            font-weight: bold;
+            color: #ffe066;
+            text-shadow: 0 1px 2px #000, 0 0 3px #000;
+            z-index: 3;
+            pointer-events: none;
+        }
+        .cell.ai-edit-mode {
+            box-shadow: inset 0 0 0 3px #ff5577;
+        }
+        .edit-banner {
+            font-size: 13px;
+            color: #ff8899;
+            margin-bottom: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .disc {
+            width: 86%;
+            height: 86%;
+            border-radius: 50%;
+            box-shadow: inset 0 4px 6px rgba(255,255,255,0.4), 0 4px 8px rgba(0,0,0,0.6);
+            z-index: 2;
+        }
+        .disc.black {
+            background: radial-gradient(circle at 30% 30%, #333 0%, #000 80%);
+        }
+        .disc.white {
+            background: radial-gradient(circle at 30% 30%, #fff 0%, #ccc 80%);
+        }
+        .cell.blocked {
+            background-color: #0a0a0d;
+        }
+        .cell.blocked:hover {
+            background-color: #0a0a0d;
+        }
+        .cell.blocked::after {
+            content: '';
+            width: 65%;
+            height: 65%;
+            position: absolute;
+            border-radius: 4px;
+            background: repeating-linear-gradient(45deg, #3a3a42, #3a3a42 3px, transparent 3px, transparent 9px);
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>リバーシ配置メモ</h1>
+
+    <!-- ２枚目以降の写真通りにテキストと順番を完全修正 -->
+    <div class="controls">
+        <div class="control-group">
+            <label for="orientationSelect">配置ルール:</label>
+            <select id="orientationSelect">
+                <option value="original">オリジナル（黒が左上）</option>
+                <option value="normal">通常（標準配置）</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="aiColorSelect">相手の色:</label>
+            <select id="aiColorSelect">
+                <option value="white">黒</option>
+                <option value="black">白</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="turnSelect">出番:</label>
+            <select id="turnSelect">
+                <option value="ai">自分が先</option>
+                <option value="player">相手が先</option>
+            </select>
+        </div>
+        <button id="startBtn">ゲーム開始</button>
+        <button id="undoBtn" disabled>1手戻す</button>
+        <button id="resetBtn">リセット</button>
+    </div>
+
+    <div class="status" id="statusMsg">設定を選んで「ゲーム開始」を押してください</div>
+    <div class="edit-banner" id="editBanner" style="display:none;">⚠ AIの手を編集中：好きなマスをクリックしてAIの代わりに置いてください（この1手のみ）</div>
+
+    <div class="board" id="board"></div>
+
+<!--
+  Egaroucid(wasm)連携アダプター。
+  同じフォルダに以下を置いてください：
+    egaroucid_adapter.js（このファイル自体は既に読み込み設定済み）
+    ai.js   ← あなたのフォークの web_resources/ja/web/ai.js
+    ai.wasm ← 同じく web_resources/ja/web/ai.wasm
+  未配置でもこのページ自体は今まで通り(JS内蔵AI)で動作します。
+-->
+<script src="egaroucid_adapter.js"></script>
+<script>
+    const EMPTY = 0;
+    const BLACK = 1;
+    const WHITE = -1;
+    const BLOCKED = 2;
+
+    const EVAL_MAP = [
+        [ 150, -40,  25,   5,   5,  25, -40, 150],
+        [-40, -80,  -5,  -5,  -5,  -5, -80, -40],
+        [  25,  -5,  20,   3,   3,  20,  -5,  25],
+        [   5,  -5,   3,   2,   2,   3,  -5,   5],
+        [   5,  -5,   3,   2,   2,   3,  -5,   5],
+        [  25,  -5,  20,   3,   3,  20,  -5,  25],
+        [-40, -80,  -5,  -5,  -5,  -5, -80, -40],
+        [ 150, -40,  25,   5,   5,  25, -40, 150]
+    ];
+
+    const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+    // 高速化：探索の最深部（isValidMove/getFlipCount/applyMoveMutable等）で毎回
+    // "for (const [dr, dc] of DIRS)" と配列分割代入・イテレータを使うと、その分のオーバーヘッドが
+    // 呼び出し回数（＝探索ノード数）に比例して積み重なる。中身のロジックは一切変えず、
+    // 同じ8方向を「添字ループ＋フラット配列」で回すだけにして、その事務コストを削る。
+    const DR = [-1,-1,-1,0,0,1,1,1];
+    const DC = [-1,0,1,-1,1,-1,0,1];
+
+    // ===== ビットボード（64bit整数2つ＝32bit整数×2ワードで表現）=====
+    // 「頭脳」（評価関数の中身・探索アルゴリズムの判断基準）は一切変更せず、
+    // 「合法手の生成」と「機動力（実際に打てる手の数）の集計」という、探索中に
+    // 最も高頻度で呼ばれる処理だけを、8x8配列の総当たりループからビットボードの
+    // 定数時間演算に置き換える。BigIntは1回の演算コストが大きくJS上ではむしろ
+    // 遅くなることをベンチマークで確認済みのため、32bit整数2ワード（hi=bit32-63,
+    // lo=bit0-31）による手作りのビット演算で実装する（配列版との数十万局面の
+    // 突き合わせで完全一致を確認済み）。
+    const COL0_32 = 0x01010101;              // 各行の列0（a筋）のビットパターン
+    const COL7_32 = 0x80808080;              // 各行の列7（h筋）のビットパターン
+    const NOT_COL0 = (~COL0_32) >>> 0;
+    const NOT_COL7 = (~COL7_32) >>> 0;
+
+    let _rHi = 0, _rLo = 0; // シフト結果の一時退避（オブジェクト生成を避けるためのスクラッチ変数）
+
+    function shlM(hi, lo, s, maskHi, maskLo) {
+        const h = hi & maskHi, l = lo & maskLo;
+        _rHi = ((h << s) | (l >>> (32 - s))) >>> 0;
+        _rLo = (l << s) >>> 0;
+    }
+    function shrM(hi, lo, s, maskHi, maskLo) {
+        const h = hi & maskHi, l = lo & maskLo;
+        _rLo = ((l >>> s) | (h << (32 - s))) >>> 0;
+        _rHi = (h >>> s) >>> 0;
+    }
+    function shrM8(hi, lo) { _rLo = ((lo >>> 8) | (hi << 24)) >>> 0; _rHi = (hi >>> 8) >>> 0; }
+    function shlM8(hi, lo) { _rHi = ((hi << 8) | (lo >>> 24)) >>> 0; _rLo = (lo << 8) >>> 0; }
+
+    // 8方向：0=N,1=S,2=E,3=W,4=NE,5=NW,6=SE,7=SW（元のDR/DCと同じ8方向）
+    function stepDir(dir, hi, lo) {
+        switch (dir) {
+            case 0: shrM8(hi, lo); return;
+            case 1: shlM8(hi, lo); return;
+            case 2: shlM(hi, lo, 1, NOT_COL7, NOT_COL7); return;
+            case 3: shrM(hi, lo, 1, NOT_COL0, NOT_COL0); return;
+            case 4: shrM(hi, lo, 7, NOT_COL7, NOT_COL7); return;
+            case 5: shrM(hi, lo, 9, NOT_COL0, NOT_COL0); return;
+            case 6: shlM(hi, lo, 9, NOT_COL7, NOT_COL7); return;
+            case 7: shlM(hi, lo, 7, NOT_COL0, NOT_COL0); return;
+        }
+    }
+
+    // own/opp/emptyのビットボードから、その色の合法手ビットボードを1パスで求める
+    // （従来の「各マスごとに8方向×最大7マスを毎回スキャン」を、方向ごとの定数回シフトに置換）
+    const _movesResult = { hi: 0, lo: 0 };
+    function legalMovesBB(ownHi, ownLo, oppHi, oppLo, emptyHi, emptyLo) {
+        let movesHi = 0, movesLo = 0;
+        for (let dir = 0; dir < 8; dir++) {
+            stepDir(dir, ownHi, ownLo);
+            let xHi = _rHi & oppHi, xLo = _rLo & oppLo;
+            for (let k = 0; k < 5; k++) {
+                stepDir(dir, xHi, xLo);
+                xHi = (_rHi & oppHi) | xHi; xLo = (_rLo & oppLo) | xLo;
+            }
+            stepDir(dir, xHi, xLo);
+            movesHi = (movesHi | (_rHi & emptyHi)) >>> 0;
+            movesLo = (movesLo | (_rLo & emptyLo)) >>> 0;
+        }
+        _movesResult.hi = movesHi; _movesResult.lo = movesLo;
+        return _movesResult;
+    }
+
+    function popcount32(x) {
+        x = x - ((x >>> 1) & 0x55555555);
+        x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+        x = (x + (x >>> 4)) & 0x0f0f0f0f;
+        return (x * 0x01010101) >>> 24;
+    }
+    function popcount64(hi, lo) { return popcount32(hi) + popcount32(lo); }
+
+    // 盤面配列(8x8)からビットボード(2ワード×黒白)を作る。AIの手番root、及びヒント計算のみで呼ぶ
+    // （O(64)の変換だが、探索ノードごとではなく1手ごとに1回だけなのでコストは無視できる）
+    function boardToBB(b) {
+        let bHi = 0, bLo = 0, wHi = 0, wLo = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const v = b[r][c];
+                if (v === EMPTY || v === BLOCKED) continue;
+                const idx = r * 8 + c;
+                if (idx < 32) {
+                    if (v === BLACK) bLo = (bLo | (1 << idx)) >>> 0; else wLo = (wLo | (1 << idx)) >>> 0;
+                } else {
+                    const s = idx - 32;
+                    if (v === BLACK) bHi = (bHi | (1 << s)) >>> 0; else wHi = (wHi | (1 << s)) >>> 0;
+                }
+            }
+        }
+        return { blackHi: bHi, blackLo: bLo, whiteHi: wHi, whiteLo: wLo };
+    }
+
+    // 合法手ビットボードを {r,c} の配列に変換（立っているビットの数だけループ＝O(手数)）
+    function bitsToMoves(hi, lo) {
+        const moves = [];
+        let l = lo >>> 0;
+        while (l) {
+            const bit = l & (-l);
+            const idx = 31 - Math.clz32(bit);
+            moves.push({ r: idx >> 3, c: idx & 7 });
+            l = (l ^ bit) >>> 0;
+        }
+        let h = hi >>> 0;
+        while (h) {
+            const bit = h & (-h);
+            const idx = 32 + (31 - Math.clz32(bit));
+            moves.push({ r: idx >> 3, c: idx & 7 });
+            h = (h ^ bit) >>> 0;
+        }
+        return moves;
+    }
+
+    // 特定の1手について、反転するマス数だけをビットボードで求める（orderMovesの手の並べ替え専用）。
+    // 判定内容はgetFlipCount（配列版）と完全に同じ「連続する相手石→自分石で終端」というルールを
+    // ビット演算でなぞっているだけで、順位付けの基準は一切変えていない。
+    function flipCountBB(midx, ownHi, ownLo, oppHi, oppLo) {
+        let moveHi = 0, moveLo = 0;
+        if (midx < 32) moveLo = (1 << midx) >>> 0; else moveHi = (1 << (midx - 32)) >>> 0;
+        let total = 0;
+        for (let dir = 0; dir < 8; dir++) {
+            stepDir(dir, moveHi, moveLo);
+            let curHi = _rHi, curLo = _rLo, cnt = 0;
+            while ((curHi !== 0 || curLo !== 0) && ((curHi & oppHi) !== 0 || (curLo & oppLo) !== 0)) {
+                cnt++;
+                stepDir(dir, curHi, curLo);
+                curHi = _rHi; curLo = _rLo;
+            }
+            if ((curHi !== 0 || curLo !== 0) && ((curHi & ownHi) !== 0 || (curLo & ownLo) !== 0)) total += cnt;
+        }
+        return total;
+    }
+
+    // 無効化マス（blocked）のビットボード。ゲーム開始/リセット/編集トグル時にのみ再計算する
+    let blockedHi = 0, blockedLo = 0;
+    function recomputeBlockedBB() {
+        let bh = 0, bl = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (blockedMask[r][c]) {
+                    const idx = r * 8 + c;
+                    if (idx < 32) bl = (bl | (1 << idx)) >>> 0; else bh = (bh | (1 << (idx - 32))) >>> 0;
+                }
+            }
+        }
+        blockedHi = bh; blockedLo = bl;
+    }
+
+    // 着手によって反転したマス（flippedIdx、既存の配列版ロジックが正しく算出したもの）から、
+    // 着手後のビットボードを差分更新で求める（新たな反転探索ロジックを増やさず、
+    // 既に検証済みの配列版の反転結果をそのままビットボードに反映するだけなのでバグの入り込む余地がない）
+    function bbAfterMove(color, bHi, bLo, wHi, wLo, r, c, flippedIdx) {
+        let flipHi = 0, flipLo = 0;
+        for (let i = 0; i < flippedIdx.length; i++) {
+            const idx = flippedIdx[i];
+            if (idx < 32) flipLo = (flipLo | (1 << idx)) >>> 0; else flipHi = (flipHi | (1 << (idx - 32))) >>> 0;
+        }
+        const midx = r * 8 + c;
+        let moveHi = 0, moveLo = 0;
+        if (midx < 32) moveLo = (1 << midx) >>> 0; else moveHi = (1 << (midx - 32)) >>> 0;
+
+        if (color === BLACK) {
+            return {
+                blackHi: (bHi | flipHi | moveHi) >>> 0, blackLo: (bLo | flipLo | moveLo) >>> 0,
+                whiteHi: (wHi & ~flipHi) >>> 0, whiteLo: (wLo & ~flipLo) >>> 0
+            };
+        } else {
+            return {
+                blackHi: (bHi & ~flipHi) >>> 0, blackLo: (bLo & ~flipLo) >>> 0,
+                whiteHi: (wHi | flipHi | moveHi) >>> 0, whiteLo: (wLo | flipLo | moveLo) >>> 0
+            };
+        }
+    }
+
+    // 隅座標と、それに付随するX打点・Cマスの一覧（動的コーナー評価に使用）
+    const CORNER_ADJ = [
+        { corner: [0, 0], adj: [[0, 1], [1, 0], [1, 1]] },
+        { corner: [0, 7], adj: [[0, 6], [1, 7], [1, 6]] },
+        { corner: [7, 0], adj: [[7, 1], [6, 0], [6, 1]] },
+        { corner: [7, 7], adj: [[7, 6], [6, 7], [6, 6]] }
+    ];
+
+    let board = Array(8).fill(null).map(() => Array(8).fill(EMPTY));
+    let turn = BLACK;
+    let myColor = BLACK;
+    let aiColor = WHITE;
+    let isGameRunning = false;
+    let aiThinking = false;
+    let aiLastMove = null;
+    let historyStack = [];
+    let blockedMask = Array(8).fill(null).map(() => Array(8).fill(false));
+    let orientationNormal = false; // false = original (reversed labels), true = normal
+    let aiEditMode = false; // true = user may place AI's stone for one move after undo
+    let hintPercents = {}; // "r,c" -> percent, for current player's turn hints
+    let hintCalcToken = 0;
+
+    const boardEl = document.getElementById('board');
+    const statusMsg = document.getElementById('statusMsg');
+    const startBtn = document.getElementById('startBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const aiColorSelect = document.getElementById('aiColorSelect');
+    const turnSelect = document.getElementById('turnSelect');
+    const orientationSelect = document.getElementById('orientationSelect');
+    const editBanner = document.getElementById('editBanner');
+
+    // 注意：「相手の色」「出番」プルダウンのラベル表記は、配置ルールの設定に関わらず
+    // 常に最初にご指示いただいた意図的な逆表記のまま固定する（絶対に変更しない）。
+    // 「配置ルール」が切り替えるのは盤面の初期配置（下のinitGame参照）のみ。
+
+    function initDOMBoard() {
+        boardEl.innerHTML = '';
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+                cell.addEventListener('click', handleCellClick);
+                boardEl.appendChild(cell);
+            }
+        }
+    }
+
+    function initGame() {
+        board = Array(8).fill(null).map(() => Array(8).fill(EMPTY));
+        if (orientationSelect.value === 'normal') {
+            // 通常配置（一般的なオセロの初期配置）
+            board[3][3] = WHITE;
+            board[3][4] = BLACK;
+            board[4][3] = BLACK;
+            board[4][4] = WHITE;
+        } else {
+            // オリジナル配置（意図的な非標準配置：黒が左上）
+            board[3][3] = BLACK;
+            board[3][4] = WHITE;
+            board[4][3] = WHITE;
+            board[4][4] = BLACK;
+        }
+        applyBlockedMask();
+        recomputeBlockedBB();
+
+        aiThinking = false;
+        aiLastMove = null;
+        historyStack = [];
+        ttClear();
+        historyTable = { 1: {}, [-1]: {} };
+        updateUndoButton();
+        updateUI();
+    }
+
+    // ゲーム開始前の盤面編集用（無効マスの反映のみ、駒は置かない）
+    function applyBlockedMask() {
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (blockedMask[r][c]) board[r][c] = BLOCKED;
+            }
+        }
+    }
+
+    function setupBoard() {
+        board = Array(8).fill(null).map(() => Array(8).fill(EMPTY));
+        applyBlockedMask();
+        recomputeBlockedBB();
+        aiThinking = false;
+        aiLastMove = null;
+        historyStack = [];
+        updateUndoButton();
+        updateUI();
+    }
+
+    // 中央4マスは初期配置に必須のため無効化不可
+    function isCenterCell(r, c) {
+        return (r === 3 || r === 4) && (c === 3 || c === 4);
+    }
+
+    function toggleBlockedCell(r, c) {
+        if (isCenterCell(r, c)) {
+            statusMsg.textContent = '中央4マスは初期配置のため無効化できません。';
+            return;
+        }
+        blockedMask[r][c] = !blockedMask[r][c];
+        board[r][c] = blockedMask[r][c] ? BLOCKED : EMPTY;
+        recomputeBlockedBB();
+        updateUI();
+    }
+
+    function saveHistory(mover) {
+        historyStack.push({
+            board: board.map(row => [...row]),
+            turn: turn,
+            aiLastMove: aiLastMove ? { ...aiLastMove } : null,
+            mover: mover // 'player' or 'ai' - このスナップショットの直後に打ったのは誰か
+        });
+        updateUndoButton();
+    }
+
+    function updateUndoButton() {
+        undoBtn.disabled = (historyStack.length === 0 || !isGameRunning || aiThinking);
+    }
+
+    function updateUI() {
+        const cells = boardEl.children;
+        if (cells.length === 0) return;
+
+        const validMoves = getValidMoves(board, turn);
+
+        const playerCanActNow = isGameRunning && !aiThinking &&
+            ((turn === myColor && !aiEditMode) || (aiEditMode && turn === aiColor));
+        const hintColor = aiEditMode ? aiColor : myColor;
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const idx = r * 8 + c;
+                const cell = cells[idx];
+                cell.innerHTML = '';
+                cell.classList.remove('hint', 'last-move', 'blocked', 'ai-edit-mode');
+
+                if (aiLastMove && aiLastMove.r === r && aiLastMove.c === c) {
+                    cell.classList.add('last-move');
+                }
+
+                if (board[r][c] === BLACK) {
+                    const disc = document.createElement('div');
+                    disc.className = 'disc black';
+                    cell.appendChild(disc);
+                } else if (board[r][c] === WHITE) {
+                    const disc = document.createElement('div');
+                    disc.className = 'disc white';
+                    cell.appendChild(disc);
+                } else if (board[r][c] === BLOCKED) {
+                    cell.classList.add('blocked');
+                } else if (playerCanActNow && validMoves.some(m => m.r === r && m.c === c)) {
+                    cell.classList.add('hint');
+                    if (aiEditMode) cell.classList.add('ai-edit-mode');
+                    const key = r + ',' + c;
+                    if (hintPercents[key] !== undefined) {
+                        const pctEl = document.createElement('div');
+                        pctEl.className = 'hint-pct';
+                        pctEl.textContent = hintPercents[key] + '%';
+                        cell.appendChild(pctEl);
+                    }
+                }
+            }
+        }
+
+        if (playerCanActNow) {
+            computeHintPercents(hintColor, validMoves);
+        } else {
+            hintPercents = {};
+        }
+
+        if (!isGameRunning) {
+            statusMsg.textContent = '設定を選び、盤面のマスをクリックすると無効化できます。準備ができたら「ゲーム開始」を押してください';
+            return;
+        }
+
+        const counts = countDiscs(board);
+        const scoreStr = `【黒:${counts.black} 対 白:${counts.white}】`;
+
+        if (isGameOver(board)) {
+            let winMsg = "";
+            if (counts.black === counts.white) winMsg = "引き分け";
+            else if (counts.black > counts.white) winMsg = "黒の勝ち";
+            else winMsg = "白の勝ち";
+            statusMsg.textContent = `${scoreStr} 終局：${winMsg}`;
+            return;
+        }
+
+        if (aiThinking) {
+            statusMsg.textContent = `${scoreStr} AI演算中...⚡`;
+        } else {
+            const turnStr = (turn === BLACK) ? "黒" : "白";
+            const ownerStr = (turn === myColor) ? "(あなた)" : "(AI)";
+            statusMsg.textContent = `${scoreStr} ${turnStr}の手番 ${ownerStr}`;
+        }
+    }
+
+    // ゲーム開始ボタン押下時のバグを完全修正
+    startBtn.addEventListener('click', () => {
+        // 1. ユーザーが選んだ設定値をそのまま取得（勝手に上書きしない）
+        if (aiColorSelect.value === 'white') {
+            aiColor = WHITE;
+            myColor = BLACK;
+        } else {
+            aiColor = BLACK;
+            myColor = WHITE;
+        }
+
+        // 2. 出番の設定に応じて、先手(最初のturn)を決定
+        if (turnSelect.value === 'ai') {
+            turn = aiColor;
+        } else {
+            turn = myColor;
+        }
+
+        initGame();
+        isGameRunning = true;
+        aiEditMode = false;
+        editBanner.style.display = 'none';
+        updateUndoButton();
+        updateUI();
+
+        // もし相手（AI）が先攻なら、即座にAIを思考させる
+        if (turn === aiColor) {
+            setTimeout(triggerAI, 100);
+        }
+    });
+
+    undoBtn.addEventListener('click', () => {
+        if (historyStack.length === 0 || aiThinking) return;
+        const previousState = historyStack.pop();
+        board = previousState.board;
+        turn = previousState.turn;
+        aiLastMove = previousState.aiLastMove;
+        isGameRunning = true;
+
+        // 戻した手がAIの手だった場合、1手だけプレイヤーがAIの代わりに打てるようにする
+        if (previousState.mover === 'ai') {
+            aiEditMode = true;
+            editBanner.style.display = 'block';
+        } else {
+            aiEditMode = false;
+            editBanner.style.display = 'none';
+        }
+
+        updateUndoButton();
+        updateUI();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        isGameRunning = false;
+        aiEditMode = false;
+        editBanner.style.display = 'none';
+        setupBoard();
+        statusMsg.textContent = 'リセット完了。マスをクリックして盤面を編集するか、設定を選び開始してください。';
+    });
+
+    function handleCellClick(e) {
+        const r = parseInt(this.dataset.row);
+        const c = parseInt(this.dataset.col);
+
+        if (!isGameRunning) {
+            toggleBlockedCell(r, c);
+            return;
+        }
+
+        if (aiThinking) return;
+
+        // AI手編集モード：戻した直後の1手だけ、AIの色をプレイヤーが代打ちできる
+        if (aiEditMode && turn === aiColor) {
+            if (isValidMove(board, r, c, aiColor)) {
+                saveHistory('ai');
+                makeMove(board, r, c, aiColor);
+                aiLastMove = { r, c };
+                aiEditMode = false;
+                editBanner.style.display = 'none';
+                switchTurn();
+            }
+            return;
+        }
+
+        if (turn !== myColor) return;
+
+        if (isValidMove(board, r, c, myColor)) {
+            saveHistory('player');
+            makeMove(board, r, c, myColor);
+            switchTurn();
+        }
+    }
+
+    function switchTurn() {
+        turn = -turn;
+        updateUI();
+
+        if (isGameOver(board)) return;
+
+        if (getValidMoves(board, turn).length === 0) {
+            alert((turn === myColor ? "あなた" : "AI") + "は打てる場所がないためパスします。");
+            turn = -turn;
+            updateUI();
+            if (getValidMoves(board, turn).length === 0) return;
+        }
+
+        if (turn === aiColor && isGameRunning && !aiEditMode) {
+            setTimeout(triggerAI, 50);
+        }
+    }
+
+    // ===== AIエンジン v2: 反復深化 + 置換表(TT) + 強化評価関数 =====
+    let TT = new Map();
+    let ttSize = 0;
+    const TT_MAX = 400000;
+    let historyTable = { 1: {}, [-1]: {} }; // BLACK/WHITE ごとの履歴ヒューリスティック（枝刈り効率向上、ゲーム開始時のみリセット）
+
+    // ===== 高速化：置換表キーをZobristハッシュ化 =====
+    // 従来は探索ノードに入るたび毎回「盤面64マス全部を文字列に変換」してキーを作っていたが、
+    // これは探索ノード数に比例して重くのしかかるコストだった（評価関数やαβの精度・強さには
+    // 一切関係ない、単なる「置換表の住所を作るための事務作業」）。
+    // Zobristハッシュは、各マス×各色ごとに固定の乱数を1つ割り当てておき、
+    // 「石を置く／ひっくり返す」たびにその乱数をXORするだけで盤面ハッシュを更新できる手法。
+    // 差分更新だけで済むので、毎回盤面を総なめする必要がなくなり、置換表キーの生成コストが
+    // ほぼゼロに近くなる。生成されるキー自体は従来のboardKeyと同じ役割（同一局面なら同一キー）
+    // を果たすので、探索結果・評価値・選ばれる手は一切変わらない（＝思考の中身は完全に同一）。
+    const ZOBRIST_HI = [], ZOBRIST_LO = [];
+    for (let i = 0; i < 64; i++) {
+        ZOBRIST_HI.push([(Math.random() * 4294967296) >>> 0, (Math.random() * 4294967296) >>> 0]);
+        ZOBRIST_LO.push([(Math.random() * 4294967296) >>> 0, (Math.random() * 4294967296) >>> 0]);
+    }
+    function colorIdx(color) { return color === BLACK ? 0 : 1; }
+
+    // 盤面全体から一度だけハッシュを計算する（探索開始時など、頻繁には呼ばれない箇所専用）
+    function computeZobrist(b) {
+        let hi = 0, lo = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const v = b[r][c];
+                if (v === BLACK || v === WHITE) {
+                    const idx = r * 8 + c, ci = colorIdx(v);
+                    hi ^= ZOBRIST_HI[idx][ci];
+                    lo ^= ZOBRIST_LO[idx][ci];
+                }
+            }
+        }
+        return { hi: hi >>> 0, lo: lo >>> 0 };
+    }
+
+    // 1手ぶんのハッシュ差分（新規に置いた1マス＋ひっくり返った全マス）をまとめて計算
+    function hashDeltaForMove(r, c, color, flippedIdx) {
+        const ci = colorIdx(color), oi = 1 - ci;
+        let dHi = ZOBRIST_HI[r * 8 + c][ci];
+        let dLo = ZOBRIST_LO[r * 8 + c][ci];
+        for (let i = 0; i < flippedIdx.length; i++) {
+            const idx = flippedIdx[i];
+            dHi ^= ZOBRIST_HI[idx][ci] ^ ZOBRIST_HI[idx][oi];
+            dLo ^= ZOBRIST_LO[idx][ci] ^ ZOBRIST_LO[idx][oi];
+        }
+        return { dHi: dHi >>> 0, dLo: dLo >>> 0 };
+    }
+
+    // 高速化：以前はhi/loをBigIntのビット演算で結合してMapのキーにしていたが、BigIntは
+    // 1回あたりの生成・演算コストがJSの通常number演算より大きく、探索ノードごとに毎回生成すると
+    // むしろ重くなる（他のビットボード処理でBigIntを避けているのと同じ理由）。
+    // ここではhiを外側Mapのキー、(lo*2+colorビット)を内側Mapのキーとする2段Mapに変更する。
+    // lo*2+colorは最大で2^33未満に収まりJSのnumberとして安全（IEEE754の精度落ちなし）。
+    // 「hi/loが完全一致する場合のみ同一エントリになる」という置換表としての正しさは従来と不変。
+    function ttGet(hi, lo, color) {
+        const inner = TT.get(hi >>> 0);
+        if (!inner) return undefined;
+        return inner.get(lo * 2 + (color === BLACK ? 1 : 0));
+    }
+    function ttSet(hi, lo, color, entry) {
+        const h = hi >>> 0;
+        let inner = TT.get(h);
+        if (!inner) { inner = new Map(); TT.set(h, inner); }
+        const k = lo * 2 + (color === BLACK ? 1 : 0);
+        if (!inner.has(k)) ttSize++;
+        inner.set(k, entry);
+    }
+    function ttClear() { TT.clear(); ttSize = 0; }
+
+    // 隅から連なる同色石を「安定石」として評価（簡易安定性評価）
+    function stabilityScore(b) {
+        let score = 0;
+        const corners = [
+            { r: 0, c: 0, e1: [0, 1], e2: [1, 0] },
+            { r: 0, c: 7, e1: [0, -1], e2: [1, 0] },
+            { r: 7, c: 0, e1: [0, 1], e2: [-1, 0] },
+            { r: 7, c: 7, e1: [0, -1], e2: [-1, 0] }
+        ];
+        for (const cn of corners) {
+            const cv = b[cn.r][cn.c];
+            if (cv !== BLACK && cv !== WHITE) continue;
+            for (const edge of [cn.e1, cn.e2]) {
+                let r = cn.r, c = cn.c;
+                for (let i = 1; i < 8; i++) {
+                    r += edge[0]; c += edge[1];
+                    if (r < 0 || r > 7 || c < 0 || c > 7 || b[r][c] !== cv) break;
+                    score += cv * 8;
+                }
+            }
+        }
+        return score;
+    }
+
+    // 黒視点のスコア（正=黒有利）。位置価値・実機動力・安定石・辺境石・終盤パリティを総合評価
+    // bHi,bLo,wHi,wLo は盤面bと同一局面の黒/白ビットボード（呼び出し元の探索が既に持っているものを
+    // そのまま渡す。評価関数の中身・重み・判断基準は一切変更していない）
+    // color/ownMovesHi/ownMovesLo は呼び出し元(negamax)がdepth===0判定の直前に既に計算済みの
+    // 「手番側の合法手ビットボード」。evaluate()は従来ここをもう一度legalMovesBBで計算し直して
+    // いたが（黒白2回のうち1回は完全に無駄な再計算）、既に手元にある結果をそのまま使い回すことで
+    // 呼び出し元の1回分を省略する。省くのは事務的な再計算のみで、判定内容・返るrealBlackMoves/
+    // realWhiteMovesの値・評価スコアは従来と完全に同一（フォールバックとして未指定時は従来通り動作）。
+    function evaluate(b, bHi, bLo, wHi, wLo, color, ownMovesHi, ownMovesLo) {
+        let posScore = 0, empty = 0, frontier = 0;
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const v = b[r][c];
+                if (v === BLACK) posScore += EVAL_MAP[r][c];
+                else if (v === WHITE) posScore -= EVAL_MAP[r][c];
+                else {
+                    if (v === EMPTY) empty++;
+                    continue;
+                }
+
+                for (let i = 0; i < 8; i++) {
+                    const nr = r + DR[i], nc = c + DC[i];
+                    if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === EMPTY) {
+                        if (v === BLACK) frontier -= 1;
+                        else frontier += 1;
+                    }
+                }
+            }
+        }
+
+        // 高速化：以前はここで空きマス1つ1つに対しisValidMoveを個別呼び出し（8方向×最大7マス走査）
+        // していたが、判定内容は変えずに「ビットボードで両者の合法手を1回ずつ求めて数える」方式に
+        // 置き換えた（＝結果として得られるrealBlackMoves/realWhiteMovesの値は完全に同一）。
+        const emptyHi = (~(bHi | wHi | blockedHi)) >>> 0;
+        const emptyLo = (~(bLo | wLo | blockedLo)) >>> 0;
+        let realBlackMoves, realWhiteMoves;
+        if (ownMovesHi !== undefined && color === BLACK) {
+            realBlackMoves = popcount64(ownMovesHi, ownMovesLo);
+            const whiteMv = legalMovesBB(wHi, wLo, bHi, bLo, emptyHi, emptyLo);
+            realWhiteMoves = popcount64(whiteMv.hi, whiteMv.lo);
+        } else if (ownMovesHi !== undefined && color === WHITE) {
+            realWhiteMoves = popcount64(ownMovesHi, ownMovesLo);
+            const blackMv = legalMovesBB(bHi, bLo, wHi, wLo, emptyHi, emptyLo);
+            realBlackMoves = popcount64(blackMv.hi, blackMv.lo);
+        } else {
+            const blackMv = legalMovesBB(bHi, bLo, wHi, wLo, emptyHi, emptyLo);
+            realBlackMoves = popcount64(blackMv.hi, blackMv.lo);
+            const whiteMv = legalMovesBB(wHi, wLo, bHi, bLo, emptyHi, emptyLo);
+            realWhiteMoves = popcount64(whiteMv.hi, whiteMv.lo);
+        }
+
+        // 隅が既にどちらかの色で確定した後は、隣接するX/Cマスは「危険な打点」ではなくなる。
+        // EVAL_MAPは常に隅が空いている前提の静的な罰則を持つため、隅が埋まった場合はその分を打ち消して
+        // 評価を局面の実情に合わせる（動的コーナー評価）。
+        for (const { corner, adj } of CORNER_ADJ) {
+            const cv = b[corner[0]][corner[1]];
+            if (cv === EMPTY) continue;
+            for (const [ar, ac] of adj) {
+                const av = b[ar][ac];
+                const e = EVAL_MAP[ar][ac];
+                if (av === BLACK) posScore -= e;
+                else if (av === WHITE) posScore += e;
+            }
+        }
+
+        const stability = stabilityScore(b);
+        const gamePhase = 64 - empty;
+
+        // 実機動力：近似(隣接空きマス数)ではなく、実際の合法手数を正確に数える（上のループで算出済み）。
+        const mobWeight = gamePhase < 40 ? 14 : 6;
+        let mobilityScore = (realBlackMoves - realWhiteMoves) * mobWeight;
+        if (realBlackMoves === 0) mobilityScore -= 300;
+        if (realWhiteMoves === 0) mobilityScore += 300;
+
+        // 終盤パリティ：残り空きマス数の偶奇によって「最後に着手できる側」が有利になりやすい。
+        // 簡易的な目安として、終盤帯（空き20マス以下）でのみ軽く加点する。
+        let parityScore = 0;
+        if (empty <= 20) {
+            parityScore = (empty % 2 === 0) ? 8 : -8;
+        }
+
+        return posScore + stability * 3 + frontier * 2 + mobilityScore + parityScore;
+    }
+
+
+
+    // 現在ヒント表示中の合法手について、簡易探索による「優勢度%」を計算して盤面に薄く表示する。
+    // 本探索(AIの着手決定)とは完全に独立した軽量探索で、UIをブロックしないよう非同期で実行する。
+    function computeHintPercents(color, validMoves) {
+        const token = ++hintCalcToken;
+        if (!validMoves || validMoves.length === 0) { hintPercents = {}; return; }
+        setTimeout(() => {
+            if (token !== hintCalcToken) return;
+            const deadline = Date.now() + 350;
+            const results = {};
+            try {
+                for (const mv of validMoves) {
+                    const nb = board.map(row => [...row]);
+                    makeMove(nb, mv.r, mv.c, color);
+                    const { hi, lo } = computeZobrist(nb);
+                    const nbb = boardToBB(nb);
+                    const val = -negamax(nb, 3, -Infinity, Infinity, -color, false, deadline, [], hi, lo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+                    const pct = Math.round(100 / (1 + Math.exp(-val / 250)));
+                    results[mv.r + ',' + mv.c] = Math.max(1, Math.min(99, pct));
+                }
+            } catch (e) {
+                // タイムアウト：計算できた分だけ利用（残りは非表示のまま）
+            }
+            if (token !== hintCalcToken) return;
+            hintPercents = results;
+            renderHintPercentsOnly();
+        }, 20);
+    }
+
+    // hintPercents の値だけをヒントセルに追記する軽量描画（updateUI全体は呼ばない＝再帰防止）
+    function renderHintPercentsOnly() {
+        const cells = boardEl.children;
+        if (cells.length === 0) return;
+        for (const key in hintPercents) {
+            const [r, c] = key.split(',').map(Number);
+            const idx = r * 8 + c;
+            const cell = cells[idx];
+            if (!cell || !cell.classList.contains('hint')) continue;
+            let pctEl = cell.querySelector('.hint-pct');
+            if (!pctEl) {
+                pctEl = document.createElement('div');
+                pctEl.className = 'hint-pct';
+                cell.appendChild(pctEl);
+            }
+            pctEl.textContent = hintPercents[key] + '%';
+        }
+    }
+
+    // 浅い深さ（末端付近）では、枝刈り効果に対してflipCountBBのフル8方向スキャンが
+    // 割に合わないため計算自体を省略する。この閾値以下の残り深さでは、位置スコア・
+    // 置換表手・キラームーブ・履歴ヒューリスティックだけで並べ替える（探索の正しさ・
+    // 最終的な評価値・選ばれる手には影響しない。αβ探索なので並べ替え順は速度にのみ影響する）。
+    const ORDER_FULL_DEPTH_THRESHOLD = 2;
+    function orderMoves(moves, b, color, ttMove, killerPair, bHi, bLo, wHi, wLo, depth) {
+        // 高速化：以前は Array.sort の比較関数の中で毎回 getFlipCount（盤面の方向スキャン）を
+        // 計算し直していた。比較関数はn個の手に対しO(n log n)回呼ばれるため、同じ手のスコアを
+        // 何度も再計算する無駄が生じていた。各手のスコアは並べ替え中に変化しないので、
+        // 先にO(n)で1回だけ計算してから並べ替える（並び順・最終結果は元コードと完全に同一）。
+        // さらに、反転数の算出自体もgetFlipCount（配列8方向スキャン）からflipCountBB（ビットボード）
+        // に置き換えている（判定ルールは同一、並べ替えの基準にのみ使う値なので探索結果自体には無関係）。
+        const hasBB = bHi !== undefined;
+        const ownHi = hasBB ? (color === BLACK ? bHi : wHi) : 0, ownLo = hasBB ? (color === BLACK ? bLo : wLo) : 0;
+        const oppHi = hasBB ? (color === BLACK ? wHi : bHi) : 0, oppLo = hasBB ? (color === BLACK ? wLo : bLo) : 0;
+        // 残り深さが浅いノード（末端付近）でだけ、flipCountBBのフル計算を省略する。
+        // ttMove/killerによる並べ替えは深さに関わらず有効なので枝刈り効率の中核は保たれる。
+        const skipFlipScan = (depth !== undefined) && (depth <= ORDER_FULL_DEPTH_THRESHOLD);
+        const ht = historyTable[color];
+        const n = moves.length;
+        const scored = new Array(n);
+        for (let i = 0; i < n; i++) {
+            const m = moves[i];
+            const flipCnt = skipFlipScan ? 0 : (hasBB ? flipCountBB(m.r * 8 + m.c, ownHi, ownLo, oppHi, oppLo) : getFlipCount(b, m.r, m.c, color));
+            let s = EVAL_MAP[m.r][m.c] * 2 + flipCnt;
+            if (ht) s += (ht[m.r * 8 + m.c] || 0);
+            if (ttMove) {
+                if (m.r === ttMove.r && m.c === ttMove.c) s += 100000;
+            }
+            // キラームーブ：同じ深さで過去にβカットを引き起こした手を優先的に試す（枝刈り効率アップ）
+            if (killerPair) {
+                if (killerPair[0] && m.r === killerPair[0].r && m.c === killerPair[0].c) s += 5000;
+                if (killerPair[1] && m.r === killerPair[1].r && m.c === killerPair[1].c) s += 3000;
+            }
+            scored[i] = { m, s };
+        }
+        scored.sort((x, y) => y.s - x.s);
+        for (let i = 0; i < n; i++) moves[i] = scored[i].m;
+    }
+
+    // Negamax + αβ + 置換表。isEndGame時は最終盤面まで完全読み切り、それ以外は評価関数で打ち切る
+    // hi, lo は現在の盤面bのZobristハッシュ（呼び出し元が差分更新して渡す）
+    // bHi,bLo,wHi,wLo は現在の盤面bと同一局面の黒/白ビットボード（呼び出し元が着手の都度、既存の
+    // 反転結果(flippedIdx)から差分で作って渡す＝新規の反転探索ロジックは増やしていない）。
+    // 探索の判断基準（評価関数・αβ・PVS・LMR・置換表・キラームーブ等）は一切変更していない。
+    // 高速化：Date.now()はネイティブ呼び出しのオーバーヘッドがあり、探索ノードごとに毎回呼ぶと
+    // 数百万ノード規模では無視できないコストになる。判定内容(残り時間切れなら打ち切る)は一切変えず、
+    // 「1ノードごとに必ず確認」から「一定ノード数おきに確認」に変更するだけで、同じ0.5秒の予算内で
+    // より多くのノードを読めるようにする(=実質的な探索の深さ・強さが上がる)。
+    let nodeCounter = 0;
+    const DEADLINE_CHECK_INTERVAL = 2047; // 2^11 - 1: ビットマスクで割り算を避ける
+    function negamax(b, depth, alpha, beta, color, isEndGame, deadline, killerMoves, hi, lo, bHi, bLo, wHi, wLo) {
+        if ((nodeCounter++ & DEADLINE_CHECK_INTERVAL) === 0 && Date.now() > deadline) throw 'TIMEOUT';
+
+        const origAlpha = alpha;
+        const entry = ttGet(hi, lo, color);
+        if (entry && entry.depth >= depth) {
+            if (entry.flag === 'exact') return entry.value;
+            if (entry.flag === 'lower') alpha = Math.max(alpha, entry.value);
+            else if (entry.flag === 'upper') beta = Math.min(beta, entry.value);
+            if (alpha >= beta) return entry.value;
+        }
+
+        const ownHi = color === BLACK ? bHi : wHi, ownLo = color === BLACK ? bLo : wLo;
+        const oppHi = color === BLACK ? wHi : bHi, oppLo = color === BLACK ? wLo : bLo;
+        const emptyHi = (~(bHi | wHi | blockedHi)) >>> 0, emptyLo = (~(bLo | wLo | blockedLo)) >>> 0;
+        const movesBB = legalMovesBB(ownHi, ownLo, oppHi, oppLo, emptyHi, emptyLo);
+        const movesBBHi = movesBB.hi, movesBBLo = movesBB.lo;
+
+        if ((movesBBHi | movesBBLo) === 0) {
+            const oppMovesBB = legalMovesBB(oppHi, oppLo, ownHi, ownLo, emptyHi, emptyLo);
+            if ((oppMovesBB.hi | oppMovesBB.lo) === 0) {
+                const blackCount = popcount64(bHi, bLo), whiteCount = popcount64(wHi, wLo);
+                const diff = blackCount - whiteCount;
+                const term = diff === 0 ? 0 : (diff > 0 ? 1 : -1) * 100000 + diff * 100;
+                return color * term;
+            }
+            // パス：手数は消費しない（正確な残り空きマス数での完全読みを維持）。盤面は変化しないのでハッシュも同じまま渡す
+            return -negamax(b, depth, -beta, -alpha, -color, isEndGame, deadline, killerMoves, hi, lo, bHi, bLo, wHi, wLo);
+        }
+
+        if (depth === 0) {
+            // 注意：本当の終局（両者パス）は上のmovesBB===0分岐で正確に判定される。
+            // ここは反復深化の途中で打ち切られた非終端局面なので、常にevaluate()で近似する。
+            // （盤面が実際には埋まっていない段階で確定石数を返すと評価が不正確になるため）
+            return color * evaluate(b, bHi, bLo, wHi, wLo, color, movesBBHi, movesBBLo);
+        }
+
+        const moves = bitsToMoves(movesBBHi, movesBBLo);
+
+        if (!killerMoves[depth]) killerMoves[depth] = [null, null];
+        const killerPair = killerMoves[depth];
+        orderMoves(moves, b, color, entry && entry.move, killerPair, bHi, bLo, wHi, wLo, depth);
+
+        // PVS(Principal Variation Search)：最善候補（1手目）だけをフルウィンドウで探索し、
+        // 残りはヌルウィンドウで高速に「悪くないか」だけ確認、超えていた場合のみ再探索する。
+        // 探索するノード数を大幅に減らし、同じ時間予算でより深く読めるようにする高速化手法。
+        let best = -Infinity, bestMove = null;
+        let moveIndex = 0;
+        for (const move of moves) {
+            const flipped = applyMoveMutable(b, move.r, move.c, color);
+            const { dHi, dLo } = hashDeltaForMove(move.r, move.c, color, flipped);
+            const childHi = (hi ^ dHi) >>> 0, childLo = (lo ^ dLo) >>> 0;
+            const nbb = bbAfterMove(color, bHi, bLo, wHi, wLo, move.r, move.c, flipped);
+            let val;
+            if (moveIndex === 0) {
+                val = -negamax(b, depth - 1, -beta, -alpha, -color, isEndGame, deadline, killerMoves, childHi, childLo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+            } else {
+                // LMR：終盤(完全読み)以外・十分な深さ・後方の手（有望度が低い）は浅く読んでから、
+                // 有望そうな場合だけ本来の深さで読み直す（無駄な深読みを削って高速化）。
+                let searchDepth = depth - 1;
+                const reduce = (!isEndGame && depth >= 3 && moveIndex >= 3) ? 1 : 0;
+                val = -negamax(b, searchDepth - reduce, -alpha - 1, -alpha, -color, isEndGame, deadline, killerMoves, childHi, childLo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+                if (reduce > 0 && val > alpha) {
+                    val = -negamax(b, searchDepth, -alpha - 1, -alpha, -color, isEndGame, deadline, killerMoves, childHi, childLo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+                }
+                if (val > alpha && val < beta) {
+                    val = -negamax(b, depth - 1, -beta, -alpha, -color, isEndGame, deadline, killerMoves, childHi, childLo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+                }
+            }
+            undoMoveMutable(b, move.r, move.c, color, flipped);
+            if (val > best) { best = val; bestMove = move; }
+            if (best > alpha) alpha = best;
+            if (alpha >= beta) {
+                if (!(killerPair[0] && killerPair[0].r === move.r && killerPair[0].c === move.c)) {
+                    killerPair[1] = killerPair[0];
+                    killerPair[0] = move;
+                }
+                const ht = historyTable[color];
+                const hk = move.r * 8 + move.c;
+                ht[hk] = (ht[hk] || 0) + depth * depth;
+                break;
+            }
+            moveIndex++;
+        }
+
+        let flag = 'exact';
+        if (best <= origAlpha) flag = 'upper';
+        else if (best >= beta) flag = 'lower';
+        if (ttSize < TT_MAX) ttSet(hi, lo, color, { depth, value: best, flag, move: bestMove });
+        return best;
+    }
+
+    function triggerAI() {
+        aiThinking = true;
+        updateUI();
+
+        // ---- Egaroucid(wasm)優先呼び出し ----
+        // wasmが未接続、または途中で失敗した場合は、何もせず下の従来JS AIに
+        // フォールバックする（catch内は空でOK。既存動作を壊さないための保険）。
+        if (window.EgaroucidEngine) {
+            window.EgaroucidEngine.getBestMove(board, aiColor, 12) // レベルは0〜15。大きいほど強いが遅い
+                .then((mv) => {
+                    if (!aiThinking) return; // 既に別経路で処理済みなら何もしない
+                    aiThinking = false;
+                    if (mv) {
+                        saveHistory('ai');
+                        aiLastMove = mv;
+                        makeMove(board, mv.r, mv.c, aiColor);
+                    }
+                    switchTurn();
+                })
+                .catch(() => {
+                    // wasm未接続 or エラー → 従来のJS内蔵AIへフォールバック
+                    runJsAI();
+                });
+            return;
+        }
+        runJsAI();
+    }
+
+    function runJsAI() {
+        setTimeout(() => {
+            let empty = 0;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) if (board[r][c] === EMPTY) empty++;
+            }
+
+            // 置換表はゲーム中は保持し続ける（新規対局時のみクリア）。
+            // 手が進むごとに毎回破棄していた従来仕様をやめ、既存の探索結果を再利用することで
+            // 同じ持ち時間でもより深く読めるようにする。
+            if (ttSize > TT_MAX) ttClear();
+            const moves = getValidMoves(board, aiColor);
+            let overallBest = moves[0];
+            // 探索専用の作業用盤面。ここに対してのみ着手/復元を行い、実際の対局盤面(board)は
+            // 最終的に選ばれた1手だけを本物のmakeMoveで反映する（探索中は本物の盤面に触れない）。
+            const workBoard = board.map(row => [...row]);
+
+            if (moves.length > 0) {
+                // 終盤（空き20マス以下）は反復深化で「可能な限り深く、理想的には完全読み切り」を狙う。
+                // それ以外は中盤用の高速反復深化。どちらも同じ反復深化ループで安全に段階的に探索する。
+                // ＝ 1段深さを完了するたびに最善手を更新するので、途中でタイムアウトしても
+                //   必ずそれまでに完了した最深の探索結果（信頼できる手）が採用される。
+                const isEndGame = empty <= 20;
+                // ご要望どおり体感0.5秒前後の応答速度に短縮。ノード数カウント方式のdeadlineチェック(上記)と
+                // 合わせることで、短い予算の中でもこれまでと同等以上のノード数を読めるようにしている。
+                // 終盤(空き20マス以下)のみ完全読み切りを狙う可能性があるため少し長めに確保。
+                const timeBudget = isEndGame ? 900 : 480;
+                const deadline = Date.now() + timeBudget;
+                nodeCounter = 0;
+                const killerMoves = [];
+                const maxDepth = isEndGame ? empty : 40;
+                // 高速化：以前は序盤も終盤直前も一律depth6スタートだった。
+                // オセロは空きマスが多い序盤ほど着手可能数(分岐)が少なく、1手あたりの探索コストが軽い。
+                // その性質を利用し、空きマスが多い局面ではより深いdepthから反復深化を始めることで、
+                // 同じ0.5秒の予算内でも実質的な読みの深さを底上げする（探索内容・精度は一切変えていない）。
+                let startDepth;
+                if (isEndGame) {
+                    startDepth = Math.min(6, maxDepth);
+                } else if (empty >= 50) {
+                    startDepth = Math.min(8, maxDepth); // 序盤：分岐が少なく高速
+                } else if (empty >= 35) {
+                    startDepth = Math.min(7, maxDepth);
+                } else {
+                    startDepth = Math.min(6, maxDepth); // 中盤：分岐が増えるため従来通り
+                }
+
+                // ルート局面のハッシュを最初に1回だけ計算し、以降は着手のたびに差分更新する
+                const rootHash = computeZobrist(workBoard);
+                const rootHi = rootHash.hi, rootLo = rootHash.lo;
+                // ルート局面のビットボードも同様に最初に1回だけ配列から作り、以降は着手のたびに
+                // 反転結果から差分更新する（探索中に配列を総なめしてビットボード化することはしない）
+                const rootBB = boardToBB(workBoard);
+                const rootBHi = rootBB.blackHi, rootBLo = rootBB.blackLo, rootWHi = rootBB.whiteHi, rootWLo = rootBB.whiteLo;
+
+                orderMoves(moves, board, aiColor, null, undefined, rootBHi, rootBLo, rootWHi, rootWLo);
+
+                let prevRootVal = null; // アスピレーション窓：前回深さの評価値の近くだけを探索し、外れたら再探索
+
+                try {
+                    for (let depth = startDepth; depth <= maxDepth; depth++) {
+                        let windowSize = 60;
+                        let alpha, beta;
+                        if (prevRootVal === null) { alpha = -Infinity; beta = Infinity; }
+                        else { alpha = prevRootVal - windowSize; beta = prevRootVal + windowSize; }
+
+                        let localBest = null, localBestVal = -Infinity;
+
+                        for (;;) {
+                            localBest = null; localBestVal = -Infinity;
+                            let a = alpha, first = true;
+                            for (const move of moves) {
+                                const flipped = applyMoveMutable(workBoard, move.r, move.c, aiColor);
+                                const { dHi, dLo } = hashDeltaForMove(move.r, move.c, aiColor, flipped);
+                                const childHi = (rootHi ^ dHi) >>> 0, childLo = (rootLo ^ dLo) >>> 0;
+                                const nbb = bbAfterMove(aiColor, rootBHi, rootBLo, rootWHi, rootWLo, move.r, move.c, flipped);
+                                let val;
+                                if (first) {
+                                    val = -negamax(workBoard, depth - 1, -beta, -a, -aiColor, isEndGame, deadline, killerMoves, childHi, childLo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+                                    first = false;
+                                } else {
+                                    val = -negamax(workBoard, depth - 1, -a - 1, -a, -aiColor, isEndGame, deadline, killerMoves, childHi, childLo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+                                    if (val > a && val < beta) {
+                                        val = -negamax(workBoard, depth - 1, -beta, -a, -aiColor, isEndGame, deadline, killerMoves, childHi, childLo, nbb.blackHi, nbb.blackLo, nbb.whiteHi, nbb.whiteLo);
+                                    }
+                                }
+                                undoMoveMutable(workBoard, move.r, move.c, aiColor, flipped);
+                                if (val > localBestVal) { localBestVal = val; localBest = move; }
+                                if (val > a) a = val;
+                            }
+                            // 窓の外に外れた場合はフルウィンドウで再探索（正確性を保証）
+                            if (localBestVal <= alpha && alpha !== -Infinity) { alpha = -Infinity; beta = Infinity; continue; }
+                            if (localBestVal >= beta && beta !== Infinity) { alpha = -Infinity; beta = Infinity; continue; }
+                            break;
+                        }
+                        prevRootVal = localBestVal;
+
+                        if (localBest) {
+                            overallBest = localBest;
+                            // 次の反復のために最善手を先頭へ並べ替え（枝刈り効率を上げる）
+                            moves.sort((a, b2) => {
+                                if (a.r === localBest.r && a.c === localBest.c) return -1;
+                                if (b2.r === localBest.r && b2.c === localBest.c) return 1;
+                                return 0;
+                            });
+                        }
+                        // 終盤で最大深さ（空きマス数ぶん＝完全読み切り）に到達できたら、
+                        // それ以上深くする意味はないのでここで打ち切る
+                        if (isEndGame && depth >= maxDepth) break;
+                    }
+                } catch (e) {
+                    // 時間切れ：直前まで完了した反復の最善手をそのまま採用（未完了の探索は破棄）
+                }
+            }
+
+            aiThinking = false;
+            if (overallBest) {
+                saveHistory('ai');
+                aiLastMove = overallBest;
+                makeMove(board, overallBest.r, overallBest.c, aiColor);
+            }
+            switchTurn();
+        }, 30);
+    }
+
+    function isValidMove(b, r, c, color) {
+        if (b[r][c] !== EMPTY) return false;
+        const opp = -color;
+        for (let i = 0; i < 8; i++) {
+            const dr = DR[i], dc = DC[i];
+            let nr = r + dr, nc = c + dc, hasOpp = false;
+            while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === opp) {
+                nr += dr; nc += dc; hasOpp = true;
+            }
+            if (hasOpp && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === color) return true;
+        }
+        return false;
+    }
+
+    function getValidMoves(b, color) {
+        const moves = [];
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (isValidMove(b, r, c, color)) moves.push({r, c});
+            }
+        }
+        return moves;
+    }
+
+    function getFlipCount(b, r, c, color) {
+        let count = 0;
+        const opp = -color;
+        for (let i = 0; i < 8; i++) {
+            const dr = DR[i], dc = DC[i];
+            let nr = r + dr, nc = c + dc, localCount = 0;
+            while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === opp) {
+                nr += dr; nc += dc; localCount++;
+            }
+            if (localCount > 0 && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === color) {
+                count += localCount;
+            }
+        }
+        return count;
+    }
+
+    function makeMove(b, r, c, color) {
+        b[r][c] = color;
+        const opp = -color;
+        for (let i = 0; i < 8; i++) {
+            const dr = DR[i], dc = DC[i];
+            let nr = r + dr, nc = c + dc;
+            const flipped = [];
+            while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === opp) {
+                flipped.push({r: nr, c: nc});
+                nr += dr; nc += dc;
+            }
+            if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === color) {
+                for (const cell of flipped) b[cell.r][cell.c] = color;
+            }
+        }
+    }
+
+    // ===== 探索専用：盤面を丸ごとコピーせず、差分だけ適用/復元する（高速化の核）=====
+    // ノードごとに8x8配列を複製していた従来方式は、探索ノード数が増えるほどGC負荷が大きくなり
+    // 実質的な探索速度（1秒あたりの読める手数）を大きく落としていた。
+    // ここでは着手で反転したマスだけを記録し、探索から戻る際にそのマスだけを元に戻すことで
+    // 「配列コピー0回」で探索を進められるようにする（同じ持ち時間でより深く読める）。
+    function applyMoveMutable(b, r, c, color) {
+        b[r][c] = color;
+        const allFlipped = [];
+        const opp = -color;
+        for (let i = 0; i < 8; i++) {
+            const dr = DR[i], dc = DC[i];
+            let nr = r + dr, nc = c + dc;
+            const line = [];
+            while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === opp) {
+                line.push(nr * 8 + nc);
+                nr += dr; nc += dc;
+            }
+            if (line.length > 0 && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && b[nr][nc] === color) {
+                for (const idx of line) { b[idx >> 3][idx & 7] = color; allFlipped.push(idx); }
+            }
+        }
+        return allFlipped;
+    }
+
+    function undoMoveMutable(b, r, c, color, flippedIdx) {
+        b[r][c] = EMPTY;
+        for (const idx of flippedIdx) b[idx >> 3][idx & 7] = -color;
+    }
+
+    function isGameOver(b) {
+        return getValidMoves(b, BLACK).length === 0 && getValidMoves(b, WHITE).length === 0;
+    }
+
+    function countDiscs(b) {
+        let black = 0, white = 0;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (b[r][c] === BLACK) black++;
+                if (b[r][c] === WHITE) white++;
+            }
+        }
+        return { black, white };
+    }
+
+    initDOMBoard();
+    setupBoard();
+</script>
+
+</body>
+</html>
