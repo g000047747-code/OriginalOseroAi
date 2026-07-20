@@ -1121,7 +1121,7 @@
         // wasmが未接続、または途中で失敗した場合は、何もせず下の従来JS AIに
         // フォールバックする（catch内は空でOK。既存動作を壊さないための保険）。
         if (window.EgaroucidEngine) {
-            window.EgaroucidEngine.getBestMove(board, aiColor, 13) // レベルは0〜15。大きいほど強いが遅い
+            window.EgaroucidEngine.getBestMove(board, aiColor, 5) // レベルは0〜15。大きいほど強いが遅い
                 .then((mv) => {
                     if (!aiThinking) return; // 既に別経路で処理済みなら何もしない
                     aiThinking = false;
